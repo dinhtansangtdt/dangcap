@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Đẳng Cấp Thế Đéo Nào Được</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: linear-gradient(to bottom, #0f0c29, #302b63, #24243e);
+      overflow: hidden;
+      height: 100vh;
+      position: relative;
+      font-family: 'Arial', sans-serif;
+      color: white;
+      user-select: none;
+    }
+
+    /* Gà & chữ con */
+    .fly-item {
+      position: absolute;
+      z-index: 10;
+      opacity: 0.95;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    .chicken-icon {
+      font-size: clamp(24px, 8vw, 50px);
+      text-shadow: 0 0 10px rgba(255,255,255,0.8);
+    }
+
+    .chicken-text {
+      font-size: clamp(12px, 4vw, 22px);
+      font-weight: bold;
+      color: #ffcc00;
+      text-shadow: 0 0 8px rgba(0,0,0,0.7);
+      transform: translateY(20px); /* Đặt dưới icon */
+    }
+
+    /* Lửa */
+    .fire {
+      position: absolute;
+      bottom: 0;
+      font-size: 24px;
+      opacity: 0.8;
+      animation: flicker 1.5s infinite alternate;
+    }
+
+    @keyframes flicker {
+      0%, 100% { opacity: 0.6; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.1); }
+    }
+
+    /* Mưa */
+    .rain {
+      position: absolute;
+      top: -20px;
+      font-size: 20px;
+      opacity: 0.7;
+      animation: fall linear forwards;
+    }
+
+    @keyframes fall {
+      to { transform: translateY(105vh); }
+    }
+
+    /* Pháo hoa */
+    .firework {
+      position: absolute;
+      font-size: 28px;
+      opacity: 0;
+      animation: explode 1.2s forwards;
+    }
+
+    @keyframes explode {
+      0% { transform: scale(0.2); opacity: 1; }
+      70% { opacity: 1; }
+      100% { transform: scale(1.5); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<script>
+  const chickenIcons = ['🐔', '🐓', '🐣', '🐥'];
+  const mainTexts = ['Đẳng Cấp Thế Đéo Nào Được', 'Em Cò Con Non Lắm', 'E Nghĩa Kó kHOK'];
+
+  // Tạo gà + chữ "gà gà" đi kèm
+  function createChickenWithText() {
+    // Tạo icon gà
+    const chickenEl = document.createElement('div');
+    chickenEl.className = 'fly-item chicken-icon';
+    const icon = chickenIcons[Math.floor(Math.random() * chickenIcons.length)];
+    chickenEl.textContent = icon;
+    
+    // Vị trí bắt đầu: từ trái hoặc phải
+    const fromLeft = Math.random() > 0.5;
+    chickenEl.style.left = fromLeft ? '-100px' : '100vw';
+    chickenEl.style.top = Math.random() * 80 + 10 + 'vh'; // 10%–90%
+    
+    document.body.appendChild(chickenEl);
+
+    // Tạo chữ "gà gà" ngay dưới
+    const textEl = document.createElement('div');
+    textEl.className = 'fly-item chicken-text';
+    textEl.textContent = 'gà gà';
+    textEl.style.left = chickenEl.style.left;
+    textEl.style.top = chickenEl.style.top;
+    document.body.appendChild(textEl);
+
+    // Cài đặt animation chung
+    const duration = Math.random() * 8 + 6; // 6–14 giây
+    const endX = fromLeft ? '110vw' : '-110px';
+    const verticalDrift = (Math.random() - 0.5) * 30; // bay chéo nhẹ
+
+    // Animation cho icon gà
+    const chickenAnim = chickenEl.animate([
+      { transform: 'translateY(0)', opacity: 0 },
+      { opacity: 1, offset: 0.1 },
+      { transform: `translateX(${fromLeft ? '110vw' : '-110px'}) translateY(${verticalDrift}vh)`, opacity: 1 },
+      { opacity: 0, offset: 0.95 }
+    ], {
+      duration: duration * 1000,
+      easing: 'ease-out',
+      fill: 'forwards'
+    });
+
+    // Animation cho chữ "gà gà" — **gần như giống hệt**
+    const textAnim = textEl.animate([
+      { transform: 'translateY(20px)', opacity: 0 },
+      { opacity: 1, offset: 0.1 },
+      { transform: `translateX(${fromLeft ? '110vw' : '-110px'}) translateY(calc(${verticalDrift}vh + 20px))`, opacity: 1 },
+      { opacity: 0, offset: 0.95 }
+    ], {
+      duration: duration * 1000,
+      easing: 'ease-out',
+      fill: 'forwards'
+    });
+
+    // Xoá sau khi xong
+    setTimeout(() => {
+      chickenEl.remove();
+      textEl.remove();
+    }, duration * 1000);
+  }
+
+  // Tạo 2 dòng chữ chính bay ngẫu nhiên (không kèm "gà gà")
+  function createMainText() {
+    const el = document.createElement('div');
+    el.className = 'fly-item';
+    el.textContent = mainTexts[Math.floor(Math.random() * mainTexts.length)];
+    el.style.color = `hsl(${Math.random() * 360}, 100%, 70%)`;
+    el.style.fontWeight = 'bold';
+    el.style.fontSize = 'clamp(18px, 5vw, 30px)';
+    el.style.whiteSpace = 'nowrap';
+
+    const side = Math.floor(Math.random() * 4);
+    let startX, startY;
+
+    switch (side) {
+      case 0: startX = '-100%'; startY = Math.random() * 100 + 'vh'; break;
+      case 1: startX = '100vw'; startY = Math.random() * 100 + 'vh'; break;
+      case 2: startX = Math.random() * 100 + 'vw'; startY = '-50px'; break;
+      case 3: startX = Math.random() * 100 + 'vw'; startY = '100vh'; break;
+    }
+
+    el.style.left = startX;
+    el.style.top = startY;
+    document.body.appendChild(el);
+
+    const duration = Math.random() * 10 + 8;
+    const endX = side < 2 ? (side === 0 ? '100vw' : '-100%') : (Math.random() * 100 + 'vw');
+    const endY = side < 2 ? (Math.random() * 100 + 'vh') : (side === 2 ? '100vh' : '-50px');
+
+    el.animate([
+      { transform: 'translate(0,0)', opacity: 0 },
+      { opacity: 1, offset: 0.1 },
+      { transform: `translate(${parseFloat(endX) - (side < 2 ? parseFloat(startX) : 0)}px, ${parseFloat(endY) - parseFloat(startY)}px)`, opacity: 1 },
+      { opacity: 0, offset: 0.95 }
+    ], {
+      duration: duration * 1000,
+      easing: 'cubic-bezier(0.2, 0.8, 0.6, 1)',
+      fill: 'forwards'
+    });
+
+    setTimeout(() => el.remove(), duration * 1000);
+  }
+
+  // --- Các hiệu ứng khác ---
+  function createFire() {
+    const count = Math.min(window.innerWidth / 50, 15);
+    for (let i = 0; i < count; i++) {
+      const fire = document.createElement('div');
+      fire.className = 'fire';
+      fire.textContent = '🔥';
+      fire.style.left = (i * (100 / count)) + '%';
+      fire.style.animationDelay = (Math.random() * 1) + 's';
+      document.body.appendChild(fire);
+    }
+  }
+
+  function createRain() {
+    const drop = document.createElement('div');
+    drop.className = 'rain';
+    drop.textContent = '💧';
+    drop.style.left = Math.random() * 100 + 'vw';
+    drop.style.fontSize = (Math.random() * 12 + 12) + 'px';
+    drop.style.opacity = Math.random() * 0.5 + 0.3;
+    const duration = Math.random() * 2 + 1;
+    drop.style.animationDuration = duration + 's';
+    document.body.appendChild(drop);
+    setTimeout(() => drop.remove(), duration * 1000);
+  }
+
+  function createFirework() {
+    if (Math.random() > 0.7) {
+      const fw = document.createElement('div');
+      fw.className = 'firework';
+      fw.textContent = ['🎆', '🎇', '✨'][Math.floor(Math.random() * 3)];
+      fw.style.left = Math.random() * 100 + 'vw';
+      fw.style.top = Math.random() * 80 + 'vh';
+      fw.style.fontSize = (Math.random() * 20 + 20) + 'px';
+      document.body.appendChild(fw);
+      setTimeout(() => fw.remove(), 1200);
+    }
+  }
+
+  // --- Khởi chạy ---
+  window.addEventListener('load', () => {
+    createFire();
+
+    setInterval(createChickenWithText, 700);      // Gà + "gà gà"
+    setInterval(createMainText, 2800);            // 2 dòng chữ chính
+    setInterval(createRain, 250);                 // Mưa
+    setInterval(createFirework, 1500);            // Pháo hoa
+  });
+</script>
+
+</body>
+</html>
