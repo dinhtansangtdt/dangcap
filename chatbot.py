@@ -1,39 +1,34 @@
 import sys
 import subprocess
 import importlib
+import tkinter as tk
+from tkinter import ttk
 
-# Danh sách các thư viện cần thiết
-REQUIRED_PACKAGES = {
-    "tkinter": None,         # built-in, không cần cài
-    "speech_recognition": "SpeechRecognition",
-    "openai": "openai",
-    "gtts": "gtts",
-    "pygame": "pygame",
-    "PIL": "Pillow",
-}
-
-def install_and_import(package_name, import_name=None):
-    if import_name is None:
-        import_name = package_name
+def install_and_import(import_name, pip_name=None):
+    if pip_name is None:
+        pip_name = import_name
     try:
         return importlib.import_module(import_name)
     except ImportError:
-        print(f"Thư viện '{import_name}' chưa được cài đặt. Đang cài đặt...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
+        print(f"Đang cài thư viện: {pip_name}...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", pip_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return importlib.import_module(import_name)
 
-# Tự động cài và import các thư viện
-tk = install_and_import("tkinter")
-ttk = getattr(tk, "ttk")  # ttk là submodule của tkinter
+# Cài các thư viện (chỉ để đảm bảo chúng tồn tại)
+install_and_import("speech_recognition", "SpeechRecognition")
+install_and_import("openai")
+install_and_import("gtts", "gtts")
+install_and_import("pygame")
+install_and_import("PIL", "Pillow")  # Đảm bảo Pillow đã cài
 
-sr = install_and_import("SpeechRecognition", "speech_recognition")
-OpenAI = install_and_import("openai", "openai").OpenAI
-gTTS = install_and_import("gtts", "gtts").gTTS
-pygame = install_and_import("pygame")
-Image = install_and_import("Pillow", "PIL").Image
-ImageTk = install_and_import("Pillow", "PIL").ImageTk
+# Import chính thức — đây là cách đúng
+import speech_recognition as sr
+from openai import OpenAI
+from gtts import gTTS
+import pygame
+from PIL import Image, ImageTk
 
-# Các thư viện built-in
+# Built-in
 import tempfile
 import uuid
 from threading import Thread
@@ -42,7 +37,7 @@ import os
 import re
 from collections import deque
 
-# === Phần còn lại giữ nguyên ===
+# === LỚP CHATBOT ===
 class AIChatBot:
     def __init__(self, root):
         self.root = root
@@ -51,7 +46,7 @@ class AIChatBot:
         self.root.configure(bg="#EAEAEA")
         self.root.resizable(False, False)
 
-        # API
+        # API (⚠️ Lưu ý: Không nên để key trực tiếp trong code)
         self.client = OpenAI(api_key="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")
 
         # Voice & State
@@ -188,7 +183,7 @@ class AIChatBot:
             self.stop_listening()
 
     def start_listening(self):
-        if self.is_resetting:  # tránh lỗi khi reset
+        if self.is_resetting:
             return
         self.is_listening = True
         self.start_btn.config(text="⏸️ Dừng", style="Red.TButton")
