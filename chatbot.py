@@ -1,9 +1,39 @@
-import tkinter as tk
-from tkinter import ttk
-import speech_recognition as sr
-from openai import OpenAI
-from gtts import gTTS
-import pygame
+import sys
+import subprocess
+import importlib
+
+# Danh sách các thư viện cần thiết
+REQUIRED_PACKAGES = {
+    "tkinter": None,         # built-in, không cần cài
+    "speech_recognition": "SpeechRecognition",
+    "openai": "openai",
+    "gtts": "gtts",
+    "pygame": "pygame",
+    "PIL": "Pillow",
+}
+
+def install_and_import(package_name, import_name=None):
+    if import_name is None:
+        import_name = package_name
+    try:
+        return importlib.import_module(import_name)
+    except ImportError:
+        print(f"Thư viện '{import_name}' chưa được cài đặt. Đang cài đặt...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", package_name])
+        return importlib.import_module(import_name)
+
+# Tự động cài và import các thư viện
+tk = install_and_import("tkinter")
+ttk = getattr(tk, "ttk")  # ttk là submodule của tkinter
+
+sr = install_and_import("SpeechRecognition", "speech_recognition")
+OpenAI = install_and_import("openai", "openai").OpenAI
+gTTS = install_and_import("gtts", "gtts").gTTS
+pygame = install_and_import("pygame")
+Image = install_and_import("Pillow", "PIL").Image
+ImageTk = install_and_import("Pillow", "PIL").ImageTk
+
+# Các thư viện built-in
 import tempfile
 import uuid
 from threading import Thread
@@ -11,9 +41,8 @@ import time
 import os
 import re
 from collections import deque
-from PIL import Image, ImageTk
 
-
+# === Phần còn lại giữ nguyên ===
 class AIChatBot:
     def __init__(self, root):
         self.root = root
