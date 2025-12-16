@@ -239,21 +239,8 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
         self._is_fullscreen = is_fullscreen
         
         if is_fullscreen:
-            # Fullscreen: Frameless window, set geometry toàn bộ màn hình
-            self.root.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
-            desktop = QApplication.desktop()
-            screen_rect = desktop.screenGeometry()
-            
-            # Log để debug
-            self.logger.info(f"Fullscreen mode: Screen size = {screen_rect.width()}x{screen_rect.height()}")
-            
-            # Set geometry trước khi show để đảm bảo fullscreen
-            # Dùng setGeometry với x=0, y=0 để đảm bảo bắt đầu từ góc trên trái
-            self.root.setGeometry(0, 0, screen_rect.width(), screen_rect.height())
-            self.root.setFixedSize(screen_rect.width(), screen_rect.height())
-            
-            # Đảm bảo không có margin
-            self.root.setContentsMargins(0, 0, 0, 0)
+            # Fullscreen: Đơn giản dùng setWindowFlags và showFullScreen
+            self.root.setWindowFlags(Qt.FramelessWindowHint)
         else:
             # Window mode: resize và set minimum size
             self.root.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
@@ -352,51 +339,12 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
 
         # 根据配置决定显示模式
         if getattr(self, "_is_fullscreen", False):
-            # Fullscreen: Đảm bảo window fullscreen ngay từ đầu
-            desktop = QApplication.desktop()
-            screen_rect = desktop.screenGeometry()
-            
-            self.logger.info(f"Showing fullscreen: {screen_rect.width()}x{screen_rect.height()}")
-            
-            # Set geometry với x=0, y=0 để đảm bảo bắt đầu từ góc trên trái
-            self.root.setGeometry(0, 0, screen_rect.width(), screen_rect.height())
-            self.root.setFixedSize(screen_rect.width(), screen_rect.height())
-            
-            # Show window
-            self.root.show()
-            
-            # Đảm bảo window ở trên cùng
-            self.root.raise_()
-            self.root.activateWindow()
-            
-            # Set window state fullscreen (backup method)
-            self.root.setWindowState(Qt.WindowFullScreen)
-            
-            # Đợi một chút rồi verify lại geometry
-            QTimer.singleShot(100, lambda: self._verify_fullscreen())
+            # Fullscreen: Đơn giản dùng showFullScreen()
+            self.root.showFullScreen()
         else:
             self.root.show()
 
         self._setup_system_tray()
-
-    def _verify_fullscreen(self):
-        """Kiểm tra và đảm bảo window fullscreen"""
-        if getattr(self, "_is_fullscreen", False) and self.root:
-            desktop = QApplication.desktop()
-            screen_rect = desktop.screenGeometry()
-            current_geom = self.root.geometry()
-            
-            if (current_geom.width() != screen_rect.width() or 
-                current_geom.height() != screen_rect.height()):
-                self.logger.warning(
-                    f"Window không fullscreen! "
-                    f"Current: {current_geom.width()}x{current_geom.height()}, "
-                    f"Expected: {screen_rect.width()}x{screen_rect.height()}"
-                )
-                # Force set lại geometry
-                self.root.setGeometry(0, 0, screen_rect.width(), screen_rect.height())
-                self.root.setFixedSize(screen_rect.width(), screen_rect.height())
-                self.root.setWindowState(Qt.WindowFullScreen)
 
     # =========================================================================
     # 信号连接
