@@ -132,6 +132,27 @@ cd /home/pi/aichat && python3 main.py --mode cli &
 
 ## Kiểm tra và xử lý lỗi
 
+### Lỗi `status=217/USER` (User không đúng):
+
+Nếu gặp lỗi này, service file đang dùng user sai. Sửa bằng cách:
+
+```bash
+# Cách 1: Dùng script tự động sửa
+sudo bash scripts/fix_service.sh
+
+# Cách 2: Sửa thủ công
+sudo nano /etc/systemd/system/aichat.service
+# Thay đổi:
+#   User=pi → User=cdddtk24 (hoặc user của bạn)
+#   Group=pi → Group=cdddtk24
+#   /home/pi/aichat → /home/cdddtk24/dangcap/aichat (đường dẫn thực tế)
+#   /home/pi/.Xauthority → /home/cdddtk24/.Xauthority
+
+# Sau đó reload:
+sudo systemctl daemon-reload
+sudo systemctl restart aichat.service
+```
+
 ### Xem log ứng dụng:
 ```bash
 tail -f logs/startup.log

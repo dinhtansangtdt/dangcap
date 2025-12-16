@@ -231,17 +231,22 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
         """
         self.root = QWidget()
         self.root.setWindowTitle("")
-        self.root.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
+        # Fullscreen mode: Frameless + WindowStaysOnTop để đảm bảo full màn
+        self.root.setWindowFlags(Qt.FramelessWindowHint | Qt.Window | Qt.WindowStaysOnTopHint)
 
         # 根据配置计算窗口大小
         window_size, is_fullscreen = self._calculate_window_size()
-        self.root.resize(*window_size)
-
-        # 设置最小窗口尺寸
-        self.root.setMinimumSize(*self.MINIMUM_WINDOW_SIZE)
-
+        
         # 保存是否全屏的状态，在 show 时使用
         self._is_fullscreen = is_fullscreen
+        
+        if is_fullscreen:
+            # Fullscreen: dùng toàn bộ màn hình, không resize
+            pass
+        else:
+            # Window mode: resize và set minimum size
+            self.root.resize(*window_size)
+            self.root.setMinimumSize(*self.MINIMUM_WINDOW_SIZE)
 
         self.root.closeEvent = self._closeEvent
 
@@ -257,31 +262,32 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
                 "SYSTEM_OPTIONS.WINDOW_SIZE_MODE", "default"
             )
 
-            # 获取屏幕尺寸（可用区域，排除任务栏等）
             desktop = QApplication.desktop()
-            screen_rect = desktop.availableGeometry()
-            screen_width = screen_rect.width()
-            screen_height = screen_rect.height()
-
+            
             # 根据模式计算窗口大小
             if window_size_mode == "default":
-                # 默认使用 50%
-                width = int(screen_width * 0.5)
-                height = int(screen_height * 0.5)
+                # 默认使用 50% (dùng availableGeometry để tránh taskbar)
+                screen_rect = desktop.availableGeometry()
+                width = int(screen_rect.width() * 0.5)
+                height = int(screen_rect.height() * 0.5)
                 is_fullscreen = False
             elif window_size_mode == "screen_75":
-                width = int(screen_width * 0.75)
-                height = int(screen_height * 0.75)
+                # 75% (dùng availableGeometry)
+                screen_rect = desktop.availableGeometry()
+                width = int(screen_rect.width() * 0.75)
+                height = int(screen_rect.height() * 0.75)
                 is_fullscreen = False
             elif window_size_mode == "screen_100":
-                # 100% 使用真正的全屏模式
-                width = screen_width
-                height = screen_height
+                # 100% 使用真正的全屏模式 - dùng screenGeometry để lấy TOÀN BỘ màn hình
+                screen_rect = desktop.screenGeometry()
+                width = screen_rect.width()
+                height = screen_rect.height()
                 is_fullscreen = True
             else:
                 # 未知模式使用 50%
-                width = int(screen_width * 0.5)
-                height = int(screen_height * 0.5)
+                screen_rect = desktop.availableGeometry()
+                width = int(screen_rect.width() * 0.5)
+                height = int(screen_rect.height() * 0.5)
                 is_fullscreen = False
 
             return ((width, height), is_fullscreen)
@@ -334,7 +340,13 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
 
         # 根据配置决定显示模式
         if getattr(self, "_is_fullscreen", False):
+            # Fullscreen: ẩn WindowStaysOnTop sau khi fullscreen để tránh conflict
+            self.root.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
             self.root.showFullScreen()
+            # Đảm bảo window chiếm toàn bộ màn hình
+            desktop = QApplication.desktop()
+            screen_rect = desktop.screenGeometry()
+            self.root.setGeometry(screen_rect)
         else:
             self.root.show()
 
