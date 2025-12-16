@@ -1,5 +1,6 @@
 import asyncio
 import gc
+import platform
 from collections import deque
 from typing import Callable, List, Optional, Protocol
 
@@ -20,6 +21,13 @@ from src.utils.config_manager import ConfigManager
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+def _is_raspberry_pi() -> bool:
+    """Kiểm tra xem thiết bị có phải là Raspberry Pi không."""
+    machine = platform.machine().lower()
+    arm_archs = ["arm", "aarch64", "armv7l", "armv6l"]
+    return any(arch in machine for arch in arm_archs)
 
 
 class AudioListener(Protocol):
@@ -324,6 +332,16 @@ class AudioCodec:
         创建音频流（完全使用设备原生格式）
         """
         try:
+            # Raspberry Pi cần latency cao hơn để tránh underrun (lag/giật)
+            # Thiết bị khác có thể dùng latency thấp hơn
+            if _is_raspberry_pi():
+                input_latency = 0.1   # 100ms cho input (RPi)
+                output_latency = 0.2  # 200ms cho output (RPi) - quan trọng để tránh giật
+                logger.info("Phát hiện Raspberry Pi, sử dụng latency cao hơn để tránh giật audio")
+            else:
+                input_latency = "low"
+                output_latency = "low"
+
             # 输入流：使用设备原生采样率和声道数
             self.input_stream = sd.InputStream(
                 device=self.mic_device_id,
@@ -333,7 +351,7 @@ class AudioCodec:
                 blocksize=self._device_input_frame_size,  # 设备原生帧大小
                 callback=self._input_callback,
                 finished_callback=self._input_finished_callback,
-                latency="low",
+                latency=input_latency,
             )
 
             # 输出流：使用设备原生采样率和声道数
@@ -345,7 +363,7 @@ class AudioCodec:
                 blocksize=self._device_output_frame_size,  # 设备原生帧大小
                 callback=self._output_callback,
                 finished_callback=self._output_finished_callback,
-                latency="low",
+                latency=output_latency,
             )
 
             self.input_stream.start()
@@ -704,6 +722,14 @@ class AudioCodec:
         if self._is_closing:
             return False if is_input else None
 
+        # Sử dụng latency phù hợp với thiết bị
+        if _is_raspberry_pi():
+            input_latency = 0.1   # 100ms cho input (RPi)
+            output_latency = 0.2  # 200ms cho output (RPi)
+        else:
+            input_latency = "low"
+            output_latency = "low"
+
         try:
             if is_input:
                 if self.input_stream:
@@ -718,7 +744,7 @@ class AudioCodec:
                     blocksize=self._device_input_frame_size,
                     callback=self._input_callback,
                     finished_callback=self._input_finished_callback,
-                    latency="low",
+                    latency=input_latency,
                 )
                 self.input_stream.start()
                 logger.info("输入流重新初始化成功")
@@ -736,7 +762,7 @@ class AudioCodec:
                     blocksize=self._device_output_frame_size,
                     callback=self._output_callback,
                     finished_callback=self._output_finished_callback,
-                    latency="low",
+                    latency=output_latency,
                 )
                 self.output_stream.start()
                 logger.info("输出流重新初始化成功")

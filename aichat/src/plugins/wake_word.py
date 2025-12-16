@@ -1,6 +1,6 @@
 from typing import Any
 
-from src.constants.constants import AbortReason
+from src.constants.constants import AbortReason, DeviceState
 from src.plugins.base import Plugin
 from src.utils.logging_config import get_logger
 
@@ -15,6 +15,7 @@ class WakeWordPlugin(Plugin):
         super().__init__()
         self.app = None
         self.detector = None
+        self._detection_paused = False  # Track trạng thái pause
 
     async def setup(self, app: Any) -> None:
         self.app = app
@@ -94,10 +95,37 @@ class WakeWordPlugin(Plugin):
             except Exception as e:
                 logger.warning(f"关闭唤醒词检测器失败: {e}")
 
+    async def on_device_state_changed(self, state) -> None:
+        """Xử lý khi trạng thái thiết bị thay đổi - pause/resume wake word detection để tiết kiệm CPU"""
+        if not self.detector:
+            return
+
+        try:
+            if state == DeviceState.IDLE:
+                # Về IDLE -> bật lại wake word detection
+                if self._detection_paused:
+                    self.detector.resume()
+                    self._detection_paused = False
+                    logger.info("[WAKE_WORD] Đã bật lại wake word detection (IDLE)")
+            else:
+                # Đang LISTENING hoặc SPEAKING -> tạm dừng wake word detection để tiết kiệm CPU
+                if not self._detection_paused:
+                    self.detector.pause()
+                    self._detection_paused = True
+                    logger.info(f"[WAKE_WORD] Tạm dừng wake word detection (state={state})")
+        except Exception as e:
+            logger.warning(f"Lỗi pause/resume wake word: {e}")
+
     async def _on_detected(self, wake_word, full_text):
         # Phát hiện wake word: bắt đầu trò chuyện tự động
         logger.info(f"[WAKE_WORD_PLUGIN] Phát hiện wake word: '{wake_word}', full_text: '{full_text}'")
         try:
+            # Pause detection ngay lập tức để tiết kiệm CPU
+            if self.detector and not self._detection_paused:
+                self.detector.pause()
+                self._detection_paused = True
+                logger.info("[WAKE_WORD] Tạm dừng wake word detection sau khi phát hiện")
+
             # Chỉ xử lý khi đang ở trạng thái IDLE
             if hasattr(self.app, "device_state") and hasattr(self.app, "start_auto_conversation"):
                 if self.app.is_idle():
