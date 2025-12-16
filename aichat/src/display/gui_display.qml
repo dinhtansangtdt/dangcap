@@ -7,6 +7,11 @@ Rectangle {
     id: root
     color: "#f5f5f5"
 
+    // Phát hiện màn hình nhỏ (RPi 3.5 inch: 480x320)
+    property bool isSmallScreen: root.width <= 520 || root.height <= 400
+    // Ẩn nút khi fullscreen trên màn nhỏ
+    property bool hideWindowButtons: isSmallScreen
+
     // 信号定义 - 与 Python 回调对接
     signal manualButtonPressed()
     signal manualButtonReleased()
@@ -28,16 +33,29 @@ Rectangle {
         anchors.margins: 0
         spacing: 0
 
-        // 自定义标题栏：最小化、关闭、可拖动
+        // 自定义标题栏：Logo căn giữa + 最小化、关闭、可拖动
         Rectangle {
             id: titleBar
             Layout.fillWidth: true
-            Layout.preferredHeight: 36
-            color: "#f7f8fa"
+            // Giảm chiều cao title bar trên màn nhỏ
+            Layout.preferredHeight: isSmallScreen ? 44 : 56
+            // Gradient nhẹ cho title bar
+            gradient: Gradient {
+                GradientStop { position: 0.0; color: "#ffffff" }
+                GradientStop { position: 1.0; color: "#f7f8fa" }
+            }
             border.width: 0
 
-            // 整条标题栏拖动（使用屏幕坐标，避免累计误差导致抖动）
-            // 放在最底层，让按钮的 MouseArea 可以优先响应
+            // Đường viền dưới tinh tế
+            Rectangle {
+                anchors.bottom: parent.bottom
+                anchors.left: parent.left
+                anchors.right: parent.right
+                height: 1
+                color: "#e8e8e8"
+            }
+
+            // 整条标题栏拖动
             MouseArea {
                 anchors.fill: parent
                 acceptedButtons: Qt.LeftButton
@@ -52,26 +70,103 @@ Rectangle {
                 onReleased: {
                     root.titleDragEnd()
                 }
-                z: 0  // 最底层
+                z: 0
             }
 
+            // Logo và tên trường - CĂNG ĐẦY CHIỀU NGANG
             RowLayout {
                 anchors.fill: parent
-                anchors.leftMargin: 10
-                anchors.rightMargin: 8
-                spacing: 8
-                z: 1  // 按钮层在拖动层上方
+                anchors.leftMargin: 8
+                anchors.rightMargin: hideWindowButtons ? 8 : 50  // Để chỗ cho nút nếu có
+                spacing: isSmallScreen ? 6 : 10
+                z: 1
 
-                // 左侧拖动区域
-                Item { id: dragArea; Layout.fillWidth: true; Layout.fillHeight: true }
+                // Logo trường
+                Image {
+                    id: schoolLogo
+                    source: displayModel ? displayModel.logoPath : ""
+                    Layout.preferredWidth: isSmallScreen ? 32 : 48
+                    Layout.preferredHeight: isSmallScreen ? 32 : 48
+                    Layout.maximumWidth: isSmallScreen ? 32 : 48
+                    Layout.maximumHeight: isSmallScreen ? 32 : 48
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
+                    antialiasing: true
+                    cache: true
+                    visible: status === Image.Ready
+                }
+
+                // Tên trường - CĂNG ĐẦY
+                Column {
+                    Layout.fillWidth: true
+                    spacing: isSmallScreen ? 0 : 2
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    Text {
+                        id: schoolNameText
+                        width: parent.width
+                        text: "TRƯỜNG CAO ĐẲNG BÌNH THUẬN"
+                        font.family: "PingFang SC, Microsoft YaHei UI, Segoe UI"
+                        font.pixelSize: isSmallScreen ? 13 : 18
+                        font.weight: Font.Bold
+                        font.letterSpacing: 0.3
+                        horizontalAlignment: Text.AlignLeft
+                        elide: Text.ElideNone
+                        wrapMode: Text.NoWrap
+                        
+                        // Màu sắc thay đổi
+                        property var colors: ["#1565C0", "#0D47A1", "#1976D2", "#2196F3", "#0288D1", "#00838F", "#00695C", "#2E7D32", "#558B2F", "#F57C00", "#E64A19", "#C62828", "#AD1457", "#6A1B9A", "#4527A0"]
+                        property int colorIndex: 0
+                        color: colors[colorIndex]
+                        
+                        // Animation chuyển màu mượt
+                        Behavior on color {
+                            ColorAnimation { duration: 1000; easing.type: Easing.InOutQuad }
+                        }
+                        
+                        // Timer đổi màu mỗi 2 giây
+                        Timer {
+                            interval: 2000  // 2 giây
+                            running: true
+                            repeat: true
+                            triggeredOnStart: true  // Kích hoạt ngay khi start
+                            onTriggered: {
+                                schoolNameText.colorIndex = (schoolNameText.colorIndex + 1) % schoolNameText.colors.length
+                            }
+                        }
+                    }
+                    Text {
+                        text: "Trợ lý AI thông minh"
+                        font.family: "PingFang SC, Microsoft YaHei UI, Segoe UI"
+                        font.pixelSize: isSmallScreen ? 9 : 12
+                        color: "#78909C"
+                        font.italic: true
+                        visible: !isSmallScreen  // Ẩn trên màn nhỏ
+                    }
+                }
+            }
+
+            // Nút minimize/close ở góc phải - ẨN TRÊN MÀN NHỎ (fullscreen)
+            Row {
+                anchors.right: parent.right
+                anchors.rightMargin: 10
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 6
+                z: 2
+                visible: !hideWindowButtons  // Ẩn khi fullscreen trên màn nhỏ
 
                 // 最小化
                 Rectangle {
                     id: btnMin
-                    width: 24; height: 24; radius: 6
+                    width: 30; height: 30; radius: 6
                     color: btnMinMouse.pressed ? "#e5e6eb" : (btnMinMouse.containsMouse ? "#f2f3f5" : "transparent")
-                    z: 2  // 确保按钮在最上层
-                    Text { anchors.centerIn: parent; text: "–"; font.pixelSize: 14; color: "#4e5969" }
+                    Text { 
+                        anchors.centerIn: parent
+                        text: "–"
+                        font.pixelSize: 18
+                        font.weight: Font.Medium
+                        color: "#4e5969"
+                    }
                     MouseArea {
                         id: btnMinMouse
                         anchors.fill: parent
@@ -83,10 +178,15 @@ Rectangle {
                 // 关闭
                 Rectangle {
                     id: btnClose
-                    width: 24; height: 24; radius: 6
+                    width: 30; height: 30; radius: 6
                     color: btnCloseMouse.pressed ? "#f53f3f" : (btnCloseMouse.containsMouse ? "#ff7875" : "transparent")
-                    z: 2  // 确保按钮在最上层
-                    Text { anchors.centerIn: parent; text: "×"; font.pixelSize: 14; color: btnCloseMouse.containsMouse ? "white" : "#86909c" }
+                    Text { 
+                        anchors.centerIn: parent
+                        text: "×"
+                        font.pixelSize: 18
+                        font.weight: Font.Medium
+                        color: btnCloseMouse.containsMouse ? "white" : "#86909c"
+                    }
                     MouseArea {
                         id: btnCloseMouse
                         anchors.fill: parent
@@ -106,21 +206,21 @@ Rectangle {
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: 12
-                spacing: 12
+                anchors.margins: isSmallScreen ? 6 : 12
+                spacing: isSmallScreen ? 6 : 12
 
                 // 状态标签
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 40
+                    Layout.preferredHeight: isSmallScreen ? 28 : 40
                     color: "#E3F2FD"
-                    radius: 10
+                    radius: isSmallScreen ? 6 : 10
 
                     Text {
                         anchors.centerIn: parent
                         text: displayModel ? displayModel.statusText : "Trạng thái: Chưa kết nối"
                         font.family: "PingFang SC, Microsoft YaHei UI"
-                        font.pixelSize: 14
+                        font.pixelSize: isSmallScreen ? 11 : 14
                         font.weight: Font.Bold
                         color: "#2196F3"
                     }
@@ -130,14 +230,16 @@ Rectangle {
                 Item {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    Layout.minimumHeight: 80
+                    Layout.minimumHeight: isSmallScreen ? 50 : 80
 
                     // 动态加载表情：AnimatedImage 用于 GIF，Image 用于静态图，Text 用于 emoji
                     Loader {
                         id: emotionLoader
                         anchors.centerIn: parent
-                        // 保持正方形，取宽高中较小值的 70%，最小60px
-                        property real maxSize: Math.max(Math.min(parent.width, parent.height) * 0.7, 60)
+                        // Responsive size cho màn nhỏ
+                        property real maxSize: isSmallScreen ? 
+                            Math.max(Math.min(parent.width, parent.height) * 0.6, 40) :
+                            Math.max(Math.min(parent.width, parent.height) * 0.7, 60)
                         width: maxSize
                         height: maxSize
 
@@ -194,7 +296,7 @@ Rectangle {
                             id: emojiComponent
                             Text {
                                 text: displayModel ? displayModel.emotionPath : "😊"
-                                font.pixelSize: 80
+                                font.pixelSize: isSmallScreen ? 50 : 80
                                 horizontalAlignment: Text.AlignHCenter
                                 verticalAlignment: Text.AlignVCenter
                             }
@@ -205,29 +307,35 @@ Rectangle {
                 // TTS 文本显示区域
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 60
+                    Layout.preferredHeight: isSmallScreen ? 50 : 80
                     color: "transparent"
 
                     Text {
                         anchors.fill: parent
-                        anchors.margins: 10
+                        anchors.margins: isSmallScreen ? 6 : 12
                         text: displayModel ? displayModel.ttsText : "Sẵn sàng"
                         font.family: "PingFang SC, Microsoft YaHei UI"
-                        font.pixelSize: 13
+                        font.pixelSize: isSmallScreen ? 16 : 22
+                        font.weight: Font.Medium
                         color: "#555555"
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                         wrapMode: Text.WordWrap
+                        elide: Text.ElideRight
+                        maximumLineCount: isSmallScreen ? 3 : 4
+                        lineHeight: 1.4
                     }
                 }
             }
         }
 
-        // 按钮区域（统一配色与尺寸）
+        // 按钮区域 - ẨN ĐI
         Rectangle {
+            id: buttonArea
             Layout.fillWidth: true
-            Layout.preferredHeight: 72
+            Layout.preferredHeight: 0
             color: "#f7f8fa"
+            visible: false
 
             RowLayout {
                 anchors.fill: parent

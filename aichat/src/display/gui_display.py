@@ -31,7 +31,7 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
     # 常量定义
     EMOTION_EXTENSIONS = (".gif", ".png", ".jpg", ".jpeg", ".webp")
     DEFAULT_WINDOW_SIZE = (880, 560)
-    MINIMUM_WINDOW_SIZE = (480, 360)
+    MINIMUM_WINDOW_SIZE = (320, 240)  # Giảm min size cho màn 3.5 inch RPi
     DEFAULT_FONT_SIZE = 12
     QUIT_TIMEOUT_MS = 3000
 

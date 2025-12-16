@@ -3,7 +3,9 @@
 GUI 显示窗口数据模型 - 用于 QML 数据绑定.
 """
 
-from PyQt5.QtCore import QObject, pyqtProperty, pyqtSignal
+from pathlib import Path
+
+from PyQt5.QtCore import QObject, QUrl, pyqtProperty, pyqtSignal
 
 
 class GuiDisplayModel(QObject):
@@ -18,6 +20,7 @@ class GuiDisplayModel(QObject):
     buttonTextChanged = pyqtSignal()
     modeTextChanged = pyqtSignal()
     autoModeChanged = pyqtSignal()
+    logoPathChanged = pyqtSignal()
 
     # 用户操作信号
     manualButtonPressed = pyqtSignal()
@@ -39,6 +42,7 @@ class GuiDisplayModel(QObject):
         self._mode_text = "Trò chuyện tự động"  # 模式切换按钮文本
         self._auto_mode = True  # Mặc định chế độ tự động
         self._is_connected = False
+        self._logo_path = self._find_logo_path()  # Logo trường
 
     # 状态文本属性
     @pyqtProperty(str, notify=statusTextChanged)
@@ -105,6 +109,36 @@ class GuiDisplayModel(QObject):
         if self._auto_mode != value:
             self._auto_mode = value
             self.autoModeChanged.emit()
+
+    # Logo path property
+    @pyqtProperty(str, notify=logoPathChanged)
+    def logoPath(self):
+        return self._logo_path
+
+    @logoPath.setter
+    def logoPath(self, value):
+        if self._logo_path != value:
+            self._logo_path = value
+            self.logoPathChanged.emit()
+
+    def _find_logo_path(self) -> str:
+        """Tìm đường dẫn logo trường."""
+        try:
+            # Tìm trong thư mục assets
+            possible_paths = [
+                Path(__file__).parent.parent.parent / "assets" / "logo.png",
+                Path(__file__).parent.parent.parent / "assets" / "logo.jpg",
+                Path("assets/logo.png"),
+                Path("assets/logo.jpg"),
+            ]
+            
+            for path in possible_paths:
+                if path.exists():
+                    return QUrl.fromLocalFile(str(path.resolve())).toString()
+            
+            return ""
+        except Exception:
+            return ""
 
     # 便捷方法
     def update_status(self, status: str, connected: bool):
