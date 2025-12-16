@@ -239,8 +239,8 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
         self._is_fullscreen = is_fullscreen
         
         if is_fullscreen:
-            # Fullscreen: Đơn giản dùng setWindowFlags và showFullScreen
-            self.root.setWindowFlags(Qt.FramelessWindowHint)
+            # Fullscreen: Set flags và sẽ maximize khi show
+            self.root.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
         else:
             # Window mode: resize và set minimum size
             self.root.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
@@ -339,10 +339,17 @@ class GuiDisplay(BaseDisplay, QObject, metaclass=CombinedMeta):
 
         # 根据配置决定显示模式
         if getattr(self, "_is_fullscreen", False):
-            # Fullscreen: Đơn giản dùng showFullScreen()
-            self.root.showFullScreen()
+            # Fullscreen: Tự động maximize như nhấn nút maximize bằng chuột
+            self.root.show()
+            # Maximize ngay lập tức
+            self.root.setWindowState(Qt.WindowMaximized)
+            # Đảm bảo window ở trên cùng
+            self.root.raise_()
+            self.root.activateWindow()
         else:
             self.root.show()
+            # Tự động maximize như nhấn nút maximize
+            QTimer.singleShot(100, lambda: self.root.setWindowState(Qt.WindowMaximized))
 
         self._setup_system_tray()
 
