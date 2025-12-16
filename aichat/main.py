@@ -13,7 +13,7 @@ def parse_args():
     """
     解析命令行参数.
     """
-    parser = argparse.ArgumentParser(description="Ứng dụng khách AI Tiểu Trí")
+    parser = argparse.ArgumentParser(description="AI CDBT")
     parser.add_argument(
         "--mode",
         choices=["gui", "cli"],

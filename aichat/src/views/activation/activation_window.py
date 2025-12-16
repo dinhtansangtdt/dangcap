@@ -503,7 +503,7 @@ class ActivationWindow(BaseWindow, AsyncMixin):
         # 取消激活流程（如果正在进行）
         if self.device_activator:
             self.device_activator.cancel_activation()
-                self.logger.info("Đã gửi tín hiệu hủy kích hoạt")
+            self.logger.info("Đã gửi tín hiệu hủy kích hoạt")
 
         # 先清理异步任务
         await self.cleanup_async_tasks()
