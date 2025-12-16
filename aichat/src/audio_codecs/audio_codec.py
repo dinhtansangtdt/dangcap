@@ -360,17 +360,10 @@ class AudioCodec:
             logger.error(f"创建音频流失败: {e}")
             raise
 
-    _input_frame_count = 0  # Debug counter
-    
     def _input_callback(self, indata, frames, time_info, status):
         """
         输入回调：设备原生格式 → 服务端协议格式 转换流程：多声道/高采样率 → 下混+重采样 → 16kHz单声道 → Opus编码.
         """
-        # Debug: log mỗi 500 frame (~10 giây)
-        AudioCodec._input_frame_count += 1
-        if AudioCodec._input_frame_count % 500 == 0:
-            logger.debug(f"[DEBUG] Đã nhận {AudioCodec._input_frame_count} audio frames từ mic")
-        
         if status and "overflow" not in str(status).lower():
             logger.warning(f"输入流状态: {status}")
 
@@ -418,8 +411,6 @@ class AudioCodec:
                     logger.warning(f"实时录音编码失败: {e}")
 
             # 步骤7: 通知音频监听器（解耦唤醒词检测）
-            if self._audio_listeners and AudioCodec._input_frame_count % 500 == 0:
-                logger.debug(f"[DEBUG] Gửi audio đến {len(self._audio_listeners)} listeners")
             for listener in self._audio_listeners:
                 try:
                     listener.on_audio_data(audio_data_int16.copy())

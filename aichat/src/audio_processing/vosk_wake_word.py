@@ -63,17 +63,8 @@ class VoskWakeWordDetector:
             self.enabled = False
             return
 
-        # Wake phrase để phát hiện (tiếng Việt + tiếng Anh)
-        # Thêm nhiều biến thể vì Vosk có thể xuất text khác nhau
-        self.wake_phrases = [
-            # Tiếng Việt (có dấu và không dấu)
-            "bạn ơi", "ban oi", "bạn ôi", "ban ơi",
-            "bạn", "ơi", "oi",
-            # Tiếng Anh (cho model tiếng Anh)
-            "hello", "hey", "hi",
-            # Các từ có thể bị nhận nhầm
-            "xin chào", "chào", "à lô", "alo"
-        ]
+        # Wake phrase để phát hiện
+        self.wake_phrases = ["hello"]
         
         # Khởi tạo Vosk model
         self._init_vosk_model(config)
@@ -119,17 +110,10 @@ class VoskWakeWordDetector:
         """Đăng ký callback khi phát hiện wake word"""
         self.on_detected_callback = callback
 
-    _audio_receive_count = 0  # Debug counter
-    
     def on_audio_data(self, audio_data: np.ndarray):
         """Nhận audio data từ AudioCodec (observer pattern)"""
         if not self.enabled or not self.is_running_flag or self.paused:
             return
-
-        # Debug: log mỗi 500 frame
-        VoskWakeWordDetector._audio_receive_count += 1
-        if VoskWakeWordDetector._audio_receive_count % 500 == 0:
-            logger.info(f"[VOSK DEBUG] Đã nhận {VoskWakeWordDetector._audio_receive_count} audio frames")
 
         try:
             self._audio_queue.put_nowait(audio_data.copy())
@@ -142,8 +126,6 @@ class VoskWakeWordDetector:
 
     async def start(self, audio_codec) -> bool:
         """Bắt đầu wake word detection"""
-        logger.info(f"[VOSK] Đang khởi động... enabled={self.enabled}, model={self.model is not None}")
-        
         if not self.enabled:
             logger.warning("Wake word không được bật")
             return False
@@ -158,14 +140,12 @@ class VoskWakeWordDetector:
             self.paused = False
 
             # Đăng ký nhận audio
-            logger.info(f"[VOSK] Đăng ký audio listener với codec: {audio_codec}")
             self.audio_codec.add_audio_listener(self)
 
             # Bắt đầu detection loop
             self.detection_task = asyncio.create_task(self._detection_loop())
 
             logger.info("Vosk Wake Word Detector đã bắt đầu!")
-            logger.info(f"[VOSK] Wake phrases: {self.wake_phrases}")
             return True
             
         except Exception as e:
@@ -222,17 +202,15 @@ class VoskWakeWordDetector:
         # Chống trigger liên tục
         current_time = time.time()
         if current_time - self.last_detection_time < self.detection_cooldown:
-            logger.debug(f"[VOSK] Cooldown, bỏ qua: '{text}'")
             return
 
-        # Chuẩn hóa text
-        text_normalized = text.lower().strip()
+        # Tách các từ trong text
+        words = text.split()
         
-        # Kiểm tra wake phrases - dùng substring match để dễ match hơn
+        # Kiểm tra wake phrases - phải là từ riêng biệt, không phải substring
         for phrase in self.wake_phrases:
-            phrase_normalized = phrase.lower().strip()
-            # Kiểm tra phrase có trong text không (substring match)
-            if phrase_normalized in text_normalized or text_normalized in phrase_normalized:
+            # Kiểm tra phrase là từ riêng biệt trong text
+            if phrase in words or text.strip() == phrase:
                 logger.info(f"[WAKE] Phát hiện '{phrase}' trong: '{text}'")
                 self.last_detection_time = current_time
                 
