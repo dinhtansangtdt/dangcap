@@ -1,0 +1,25 @@
+[Unit]
+Description=AI Chat GUI - Tự động khởi động GUI khi boot Raspberry Pi
+After=graphical.target
+Wants=graphical.target
+# Chỉ đợi graphical.target (X server), không đợi network
+
+[Service]
+Type=simple
+User=__USER__
+Group=__USER__
+WorkingDirectory=__PROJECT_DIR__
+Environment="DISPLAY=:0"
+Environment="XAUTHORITY=__HOME__/.Xauthority"
+Environment="QT_QPA_PLATFORM=wayland;xcb"
+# Đợi một chút để đảm bảo X server sẵn sàng
+ExecStartPre=/bin/sleep 3
+ExecStart=__PROJECT_DIR__/scripts/run_gui_desktop.sh
+Restart=on-failure
+RestartSec=15
+# Restart nếu lỗi, đợi 15 giây trước khi restart
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=graphical.target
