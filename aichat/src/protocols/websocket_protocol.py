@@ -1,5 +1,6 @@
 import asyncio
 import json
+import socket
 import ssl
 import time
 
@@ -64,6 +65,9 @@ class WebsocketProtocol(Protocol):
             logger.warning("连接正在关闭中，取消新的连接尝试")
             return False
 
+        # Đợi network sẵn sàng (đặc biệt quan trọng khi boot)
+        await self._wait_for_network()
+
         try:
             # 在连接时创建 Event，确保在正确的事件循环中
             self.hello_received = asyncio.Event()
@@ -73,19 +77,63 @@ class WebsocketProtocol(Protocol):
             if self.WEBSOCKET_URL.startswith("wss://"):
                 current_ssl_context = ssl_context
 
-            # 建立WebSocket连接 (兼容不同Python版本的写法)
-            try:
-                # 新的写法 (在Python 3.11+版本中)
-                self.websocket = await websockets.connect(
-                    uri=self.WEBSOCKET_URL,
-                    ssl=current_ssl_context,
-                    additional_headers=self.HEADERS,
-                    ping_interval=20,  # 使用websockets自己的心跳，20秒间隔
-                    ping_timeout=20,  # ping超时20秒
-                    close_timeout=10,  # 关闭超时10秒
-                    max_size=10 * 1024 * 1024,  # 最大消息10MB
-                    compression=None,  # 禁用压缩以提高稳定性
-                )
+            # Retry logic: thử kết nối tối đa 3 lần
+            max_retries = 3
+            retry_delay = 5  # Đợi 5 giây giữa các lần thử
+            
+            for attempt in range(1, max_retries + 1):
+                try:
+                    logger.info(f"Đang thử kết nối WebSocket (lần {attempt}/{max_retries})...")
+                    
+                    # 建立WebSocket连接 (兼容不同Python版本的写法)
+                    try:
+                        # 新的写法 (在Python 3.11+版本中)
+                        self.websocket = await asyncio.wait_for(
+                            websockets.connect(
+                                uri=self.WEBSOCKET_URL,
+                                ssl=current_ssl_context,
+                                additional_headers=self.HEADERS,
+                                ping_interval=20,  # 使用websockets自己的心跳，20秒间隔
+                                ping_timeout=20,  # ping超时20秒
+                                close_timeout=10,  # 关闭超时10秒
+                                max_size=10 * 1024 * 1024,  # 最大消息10MB
+                                compression=None,  # 禁用压缩以提高稳定性
+                            ),
+                            timeout=15.0  # Timeout 15 giây cho mỗi lần thử
+                        )
+                    except TypeError:
+                        # 旧的写法 (在较早的Python版本中)
+                        self.websocket = await asyncio.wait_for(
+                            websockets.connect(
+                                self.WEBSOCKET_URL,
+                                ssl=current_ssl_context,
+                                extra_headers=self.HEADERS,
+                                ping_interval=20,  # 使用websockets自己的心跳
+                                ping_timeout=20,  # ping超时20秒
+                                close_timeout=10,  # 关闭超时10秒
+                                max_size=10 * 1024 * 1024,  # 最大消息10MB
+                                compression=None,  # 禁用压缩
+                            ),
+                            timeout=15.0
+                        )
+                    
+                    # Kết nối thành công, break khỏi retry loop
+                    break
+                    
+                except asyncio.TimeoutError:
+                    logger.warning(f"Kết nối WebSocket timeout (lần {attempt}/{max_retries})")
+                    if attempt < max_retries:
+                        logger.info(f"Đợi {retry_delay} giây trước khi thử lại...")
+                        await asyncio.sleep(retry_delay)
+                    else:
+                        raise
+                except Exception as e:
+                    logger.warning(f"Lỗi kết nối WebSocket (lần {attempt}/{max_retries}): {e}")
+                    if attempt < max_retries:
+                        logger.info(f"Đợi {retry_delay} giây trước khi thử lại...")
+                        await asyncio.sleep(retry_delay)
+                    else:
+                        raise
             except TypeError:
                 # 旧的写法 (在较早的Python版本中)
                 self.websocket = await websockets.connect(
@@ -157,6 +205,31 @@ class WebsocketProtocol(Protocol):
         """
         if self._heartbeat_task is None or self._heartbeat_task.done():
             self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
+
+    async def _wait_for_network(self):
+        """Đợi network sẵn sàng trước khi kết nối"""
+        import socket
+        
+        max_wait = 30  # Đợi tối đa 30 giây
+        check_interval = 2  # Kiểm tra mỗi 2 giây
+        elapsed = 0
+        
+        while elapsed < max_wait:
+            try:
+                # Thử resolve DNS
+                socket.gethostbyname("google.com")
+                # Thử kết nối đến server
+                parsed_url = self.WEBSOCKET_URL.replace("wss://", "").replace("ws://", "").split("/")[0]
+                host = parsed_url.split(":")[0]
+                socket.create_connection((host, 443 if "wss" in self.WEBSOCKET_URL else 80), timeout=3)
+                logger.info("Network đã sẵn sàng")
+                return
+            except (socket.gaierror, socket.timeout, OSError):
+                elapsed += check_interval
+                if elapsed < max_wait:
+                    await asyncio.sleep(check_interval)
+        
+        logger.warning(f"Network chưa sẵn sàng sau {max_wait} giây, vẫn thử kết nối...")
 
     def _start_connection_monitor(self):
         """
