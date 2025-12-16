@@ -6,7 +6,7 @@ import sys
 import termios
 import tty
 from collections import deque
-from typing import Callable, Optional
+from typing import Callable, List, Optional
 
 from src.display.base_display import BaseDisplay
 
@@ -260,7 +260,7 @@ class CliDisplay(BaseDisplay):
         old_settings = termios.tcgetattr(fd)
         try:
             tty.setraw(fd)
-            buffer: list[str] = []
+            buffer: List[str] = []
             while True:
                 ch = os.read(fd, 4)  # 读取最多4字节，足够覆盖常见UTF-8中文
                 if not ch:

@@ -3,6 +3,7 @@ import json
 import socket
 import threading
 import time
+from typing import Tuple
 
 import paho.mqtt.client as mqtt
 from cryptography.hazmat.backends import default_backend
@@ -57,7 +58,7 @@ class MqttProtocol(Protocol):
         # 事件
         self.server_hello_event = asyncio.Event()
 
-    def _parse_endpoint(self, endpoint: str) -> tuple[str, int]:
+    def _parse_endpoint(self, endpoint: str) -> Tuple[str, int]:
         """解析endpoint字符串，提取主机和端口.
 
         Args:

@@ -25,7 +25,7 @@ class PLATFORM(Enum):
 class ARCH(Enum):
     WINDOWS = {"arm": "x64", "intel": "x64"}
     MACOS = {"arm": "arm64", "intel": "x64"}
-    LINUX = {"arm": "arm64", "intel": "x64"}
+    LINUX = {"arm64": "arm64", "armhf": "armhf", "intel": "x64"}
 
 
 # 动态链接库路径常量定义
@@ -55,13 +55,23 @@ def get_platform() -> str:
 
 def get_arch(system: PLATFORM) -> str:
     architecture = platform.machine().lower()
-    is_arm = "arm" in architecture or "aarch64" in architecture
+    is_arm64 = "aarch64" in architecture or architecture == "arm64"
+    is_armhf = "armv7" in architecture or "armv6" in architecture or (
+        "arm" in architecture and not is_arm64
+    )
+    
     if system == PLATFORM.WINDOWS:
-        arch_name = ARCH.WINDOWS.value["arm" if is_arm else "intel"]
+        arch_name = ARCH.WINDOWS.value["arm" if (is_arm64 or is_armhf) else "intel"]
     elif system == PLATFORM.MACOS:
-        arch_name = ARCH.MACOS.value["arm" if is_arm else "intel"]
+        arch_name = ARCH.MACOS.value["arm" if (is_arm64 or is_armhf) else "intel"]
     else:
-        arch_name = ARCH.LINUX.value["arm" if is_arm else "intel"]
+        # Linux: phân biệt arm64 và armhf (32-bit)
+        if is_arm64:
+            arch_name = ARCH.LINUX.value["arm64"]
+        elif is_armhf:
+            arch_name = ARCH.LINUX.value["armhf"]
+        else:
+            arch_name = ARCH.LINUX.value["intel"]
     return architecture, arch_name
 
 

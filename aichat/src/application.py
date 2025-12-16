@@ -2,7 +2,7 @@ import asyncio
 import sys
 import threading
 from pathlib import Path
-from typing import Any, Awaitable
+from typing import Any, Awaitable, Optional, Set
 
 # 允许作为脚本直接运行：把项目根目录加入 sys.path（src 的上一级）
 try:
@@ -70,17 +70,17 @@ class Application:
         self.keep_listening = False
 
         # 统一任务池（替代 _main_tasks/_bg_tasks）
-        self._tasks: set[asyncio.Task] = set()
+        self._tasks: Set[asyncio.Task] = set()
 
         # 关停事件
-        self._shutdown_event: asyncio.Event | None = None
+        self._shutdown_event: Optional[asyncio.Event] = None
 
         # 事件循环
-        self._main_loop: asyncio.AbstractEventLoop | None = None
+        self._main_loop: Optional[asyncio.AbstractEventLoop] = None
 
         # 并发控制
-        self._state_lock: asyncio.Lock | None = None
-        self._connect_lock: asyncio.Lock | None = None
+        self._state_lock: Optional[asyncio.Lock] = None
+        self._connect_lock: Optional[asyncio.Lock] = None
 
         # 插件
         self.plugins = PluginManager()
