@@ -14,7 +14,8 @@ Environment="XAUTHORITY=__HOME__/.Xauthority"
 Environment="QT_QPA_PLATFORM=wayland;xcb"
 # Đợi một chút để đảm bảo X server sẵn sàng
 ExecStartPre=/bin/sleep 3
-ExecStart=__PROJECT_DIR__/scripts/run_gui_desktop.sh
+# Chạy đơn giản: cd và python3 main.py
+ExecStart=/bin/bash -c "cd __PROJECT_DIR__ && python3 main.py"
 Restart=on-failure
 RestartSec=15
 # Restart nếu lỗi, đợi 15 giây trước khi restart

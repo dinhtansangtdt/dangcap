@@ -24,9 +24,13 @@ if [ -f "$SERVICE_FILE" ]; then
     else
         echo "ℹ️  Systemd service chưa được enable"
     fi
+    # Không xóa file, chỉ disable
 else
     echo "ℹ️  Không tìm thấy systemd service file"
 fi
 
 echo ""
 echo "✨ Hoàn tất!"
+echo ""
+echo "💡 Để xóa hết (bao gồm file service):"
+echo "   ./scripts/remove_all_autostart.sh"

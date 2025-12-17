@@ -1,0 +1,21 @@
+[Unit]
+Description=AI Chat - Chạy main.py khi boot
+After=graphical.target
+Wants=graphical.target
+
+[Service]
+Type=simple
+User=__USER__
+Group=__USER__
+WorkingDirectory=__HOME__/dangcap/aichat
+Environment="DISPLAY=:0"
+Environment="XAUTHORITY=__HOME__/.Xauthority"
+# Chạy 2 lệnh: cd và python3 main.py
+ExecStart=/bin/bash -c "cd __HOME__/dangcap/aichat && python3 main.py"
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=graphical.target
