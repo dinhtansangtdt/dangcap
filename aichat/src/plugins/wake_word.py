@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 
 from src.constants.constants import AbortReason, DeviceState
@@ -70,16 +71,68 @@ class WakeWordPlugin(Plugin):
 
     async def start(self) -> None:
         if not self.detector:
+            logger.info("Wake word detector không có, bỏ qua start")
             return
+        
         try:
             # 需要音频编码器以提供原始PCM数据
-            audio_codec = getattr(self.app, "audio_codec", None)
+            # Đợi audio_codec sẵn sàng (có thể cần thời gian trong GUI mode)
+            audio_codec = None
+            max_wait = 10  # Đợi tối đa 10 giây
+            wait_interval = 0.5  # Kiểm tra mỗi 0.5 giây
+            
+            logger.info(f"[WAKE_WORD] Bắt đầu tìm audio_codec (mode: {getattr(self.app, 'mode', 'unknown')})")
+            
+            for i in range(int(max_wait / wait_interval)):
+                audio_codec = getattr(self.app, "audio_codec", None)
+                if audio_codec is not None:
+                    # Kiểm tra thêm xem audio_codec đã được initialize chưa
+                    # Kiểm tra input_stream hoặc _is_initialized hoặc _audio_listeners
+                    if (hasattr(audio_codec, "input_stream") and audio_codec.input_stream is not None) or \
+                       (hasattr(audio_codec, "_is_initialized") and audio_codec._is_initialized) or \
+                       (hasattr(audio_codec, "_audio_listeners")):
+                        logger.info(f"[WAKE_WORD] Đã tìm thấy audio_codec sau {i * wait_interval:.1f} giây")
+                        break
+                await asyncio.sleep(wait_interval)
+            
             if audio_codec is None:
-                logger.warning("未找到audio_codec，无法启动唤醒词检测")
+                logger.warning("[WAKE_WORD] 未找到audio_codec，无法启动唤醒词检测")
+                logger.warning("[WAKE_WORD] Có thể audio plugin chưa được khởi tạo hoặc bị lỗi")
+                # Log thêm thông tin để debug
+                if hasattr(self.app, "plugins"):
+                    audio_plugin = self.app.plugins.get_plugin("audio")
+                    if audio_plugin:
+                        logger.warning(f"[WAKE_WORD] Audio plugin tồn tại nhưng codec={audio_plugin.codec}")
+                        if audio_plugin.codec:
+                            logger.warning(f"[WAKE_WORD] AudioCodec có input_stream: {hasattr(audio_plugin.codec, 'input_stream')}")
+                    else:
+                        logger.warning("[WAKE_WORD] Audio plugin không tồn tại")
                 return
-            await self.detector.start(audio_codec)
+            
+            # Kiểm tra event loop
+            try:
+                loop = asyncio.get_running_loop()
+                logger.info(f"[WAKE_WORD] Event loop: {type(loop).__name__}")
+            except Exception as e:
+                logger.warning(f"[WAKE_WORD] Không thể lấy event loop: {e}")
+            
+            logger.info("[WAKE_WORD] Đang khởi động wake word detector...")
+            result = await self.detector.start(audio_codec)
+            
+            if result:
+                logger.info("[WAKE_WORD] Wake word detector đã khởi động thành công!")
+                # Kiểm tra xem detector có đang chạy không
+                if hasattr(self.detector, "is_running_flag"):
+                    logger.info(f"[WAKE_WORD] Detector is_running_flag: {self.detector.is_running_flag}")
+                if hasattr(self.detector, "detection_task") and self.detector.detection_task:
+                    logger.info(f"[WAKE_WORD] Detection task đã được tạo: {not self.detector.detection_task.done()}")
+            else:
+                logger.error("[WAKE_WORD] Wake word detector khởi động thất bại (return False)")
+                
         except Exception as e:
-            logger.error(f"启动唤醒词检测器失败: {e}", exc_info=True)
+            logger.error(f"[WAKE_WORD] 启动唤醒词检测器失败: {e}", exc_info=True)
+            import traceback
+            logger.error(f"[WAKE_WORD] Traceback: {traceback.format_exc()}")
 
     async def stop(self) -> None:
         if self.detector:

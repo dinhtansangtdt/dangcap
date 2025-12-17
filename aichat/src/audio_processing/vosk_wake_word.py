@@ -3,6 +3,8 @@ Wake Word Detector sử dụng Vosk STT để phát hiện "Bạn ơi"
 """
 import asyncio
 import json
+import queue
+import threading
 import time
 from pathlib import Path
 from typing import Callable, Optional
@@ -34,9 +36,10 @@ class VoskWakeWordDetector:
         self.is_running_flag = False
         self.paused = False
         self.detection_task = None
+        self._main_loop = None  # Lưu main event loop
 
-        # Audio queue
-        self._audio_queue = asyncio.Queue(maxsize=100)
+        # Audio queue - dùng threading.Queue vì on_audio_data được gọi từ thread khác
+        self._audio_queue = queue.Queue(maxsize=100)
 
         # Chống trigger liên tục
         self.last_detection_time = 0
@@ -111,17 +114,22 @@ class VoskWakeWordDetector:
         self.on_detected_callback = callback
 
     def on_audio_data(self, audio_data: np.ndarray):
-        """Nhận audio data từ AudioCodec (observer pattern)"""
+        """Nhận audio data từ AudioCodec (observer pattern)
+        
+        Lưu ý: Method này được gọi từ audio thread (không có event loop),
+        nên phải dùng threading.Queue thay vì asyncio.Queue
+        """
         if not self.enabled or not self.is_running_flag or self.paused:
             return
 
         try:
+            # Dùng threading.Queue vì được gọi từ thread khác
             self._audio_queue.put_nowait(audio_data.copy())
-        except asyncio.QueueFull:
+        except queue.Full:
             try:
                 self._audio_queue.get_nowait()
                 self._audio_queue.put_nowait(audio_data.copy())
-            except asyncio.QueueEmpty:
+            except queue.Empty:
                 pass
 
     async def start(self, audio_codec) -> bool:
@@ -135,6 +143,14 @@ class VoskWakeWordDetector:
             return False
 
         try:
+            # Lưu main event loop để đảm bảo detection loop chạy trong đúng loop
+            try:
+                self._main_loop = asyncio.get_running_loop()
+                logger.info(f"[VOSK] Event loop: {type(self._main_loop).__name__}")
+            except RuntimeError:
+                logger.error("[VOSK] Không có running event loop!")
+                return False
+
             self.audio_codec = audio_codec
             self.is_running_flag = True
             self.paused = False
@@ -142,20 +158,31 @@ class VoskWakeWordDetector:
             # Đăng ký nhận audio
             self.audio_codec.add_audio_listener(self)
 
-            # Bắt đầu detection loop
+            # Bắt đầu detection loop trong main event loop
             self.detection_task = asyncio.create_task(self._detection_loop())
 
             logger.info("Vosk Wake Word Detector đã bắt đầu!")
             return True
             
         except Exception as e:
-            logger.error(f"Lỗi khởi động Vosk detector: {e}")
+            logger.error(f"Lỗi khởi động Vosk detector: {e}", exc_info=True)
             self.enabled = False
             return False
 
     async def _detection_loop(self):
-        """Vòng lặp phát hiện wake word"""
+        """Vòng lặp phát hiện wake word
+        
+        Chạy trong main event loop để có thể dùng asyncio
+        """
         audio_buffer = b""
+        
+        # Đảm bảo đang chạy trong event loop
+        try:
+            loop = asyncio.get_running_loop()
+            logger.debug(f"[VOSK] Detection loop chạy trong event loop: {type(loop).__name__}")
+        except RuntimeError as e:
+            logger.error(f"[VOSK] Detection loop không có event loop: {e}")
+            return
         
         while self.is_running_flag:
             try:
@@ -163,10 +190,10 @@ class VoskWakeWordDetector:
                     await asyncio.sleep(0.1)
                     continue
 
-                # Lấy audio từ queue
+                # Lấy audio từ queue (threading.Queue)
                 try:
                     audio_data = self._audio_queue.get_nowait()
-                except asyncio.QueueEmpty:
+                except queue.Empty:
                     await asyncio.sleep(0.01)
                     continue
 
@@ -192,9 +219,23 @@ class VoskWakeWordDetector:
                 # Không check partial result để tránh trigger sai
 
             except asyncio.CancelledError:
+                logger.info("[VOSK] Detection loop bị cancel")
                 break
+            except RuntimeError as e:
+                if "no running event loop" in str(e):
+                    logger.error(f"[VOSK] Lỗi: không có event loop trong detection loop: {e}")
+                    # Thử lấy lại event loop từ main_loop
+                    if self._main_loop and not self._main_loop.is_closed():
+                        logger.info("[VOSK] Thử tiếp tục với main_loop...")
+                        await asyncio.sleep(0.1)
+                    else:
+                        logger.error("[VOSK] Main loop không có hoặc đã đóng, dừng detection")
+                        break
+                else:
+                    logger.error(f"[VOSK] RuntimeError trong detection loop: {e}")
+                    await asyncio.sleep(0.1)
             except Exception as e:
-                logger.error(f"Lỗi trong detection loop: {e}")
+                logger.error(f"[VOSK] Lỗi trong detection loop: {e}", exc_info=True)
                 await asyncio.sleep(0.1)
 
     async def _check_wake_word(self, text: str):
@@ -246,8 +287,18 @@ class VoskWakeWordDetector:
         while not self._audio_queue.empty():
             try:
                 self._audio_queue.get_nowait()
-            except asyncio.QueueEmpty:
+            except queue.Empty:
                 break
+
+        # Cleanup Vosk model để tránh nanobind leak
+        try:
+            if self.recognizer:
+                self.recognizer = None
+            if self.model:
+                self.model = None
+            logger.debug("[VOSK] Đã cleanup Vosk model")
+        except Exception as e:
+            logger.warning(f"[VOSK] Lỗi cleanup model: {e}")
 
         logger.info("Vosk Wake Word Detector đã dừng")
 
