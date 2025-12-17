@@ -48,11 +48,35 @@ sleep 2
 if [ -d "venv" ]; then
     source venv/bin/activate
     log "Đã kích hoạt venv: venv"
+    PYTHON_CMD="python3"
 elif [ -d ".venv" ]; then
     source .venv/bin/activate
     log "Đã kích hoạt venv: .venv"
+    PYTHON_CMD="python3"
+else
+    PYTHON_CMD="python3"
+    log "Không tìm thấy venv, dùng system python3"
 fi
 
-# Chạy GUI (redirect log)
+# Kiểm tra main.py có tồn tại không
+if [ ! -f "main.py" ]; then
+    log "Lỗi: Không tìm thấy file main.py trong $PROJECT_DIR"
+    exit 1
+fi
+
+# Kiểm tra python3 có sẵn không
+if ! command -v "$PYTHON_CMD" &> /dev/null; then
+    log "Lỗi: Không tìm thấy $PYTHON_CMD"
+    exit 1
+fi
+
+# Chạy GUI với đường dẫn đầy đủ (redirect log)
 log "Khởi động ứng dụng GUI (không đợi network)..."
-exec python3 main.py --mode gui >> "$LOG_FILE" 2>&1
+log "Working directory: $PROJECT_DIR"
+log "Python command: $PYTHON_CMD"
+log "Main file: $PROJECT_DIR/main.py"
+
+# Chạy main.py với đường dẫn đầy đủ
+# Đảm bảo chạy từ đúng thư mục để import modules đúng
+cd "$PROJECT_DIR"
+exec "$PYTHON_CMD" main.py --mode gui >> "$LOG_FILE" 2>&1
